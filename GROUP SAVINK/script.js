@@ -1,4 +1,4 @@
-const storageKey = "tantrum-savings-ledger-v4";
+const storageKey = "tantrum-savings-ledger-v5";
 const friendModeKey = "tantrum-friend-contribution-mode";
 
 const sampleLedger = {
@@ -16,7 +16,8 @@ const sampleLedger = {
     { id: "m-7", name: "Tantrum Friend" }
   ],
   entries: [
-    { id: "e-1", memberId: "m-1", amount: 50000, date: "2026-01-01", note: "January saving" }
+    { id: "e-1", memberId: "m-1", amount: 50000, date: "2026-01-01" },
+    { id: "e-2", memberId: "m-1", amount: 50000, date: "2026-02-01" }
   ]
 };
 
@@ -37,7 +38,6 @@ const els = {
   amountInput: document.querySelector("#amountInput"),
   contributorInput: document.querySelector("#contributorInput"),
   currencyInput: document.querySelector("#currencyInput"),
-  dateInput: document.querySelector("#dateInput"),
   entriesBody: document.querySelector("#entriesBody"),
   entryCount: document.querySelector("#entryCount"),
   exportBtn: document.querySelector("#exportBtn"),
@@ -59,9 +59,10 @@ const els = {
   monthlyProgressText: document.querySelector("#monthlyProgressText"),
   monthlySummary: document.querySelector("#monthlySummary"),
   monthlyTarget: document.querySelector("#monthlyTarget"),
+  monthsCoveredInput: document.querySelector("#monthsCoveredInput"),
   modeLabel: document.querySelector("#modeLabel"),
   nameInput: document.querySelector("#nameInput"),
-  noteInput: document.querySelector("#noteInput"),
+  paymentMonthInput: document.querySelector("#paymentMonthInput"),
   progressFill: document.querySelector("#progressFill"),
   progressPercent: document.querySelector("#progressPercent"),
   settingsForm: document.querySelector("#settingsForm"),
@@ -93,7 +94,7 @@ function init() {
     document.body.classList.add("snapshot");
   }
 
-  els.dateInput.valueAsDate = new Date();
+  els.paymentMonthInput.value = getCurrentMonth();
   els.monthlyMonthInput.value = getCurrentMonth();
   bindEvents();
   render();
@@ -126,21 +127,25 @@ function bindEvents() {
     event.preventDefault();
     const memberId = els.contributorInput.value;
     const amount = Number(els.amountInput.value);
-    if (!memberId || !amount) return;
+    const startMonth = els.paymentMonthInput.value;
+    const monthsCovered = Math.max(1, Number(els.monthsCoveredInput.value) || 1);
+    if (!memberId || !amount || !startMonth) return;
 
-    ledger.entries.push({
-      id: createId("e"),
-      memberId,
-      amount,
-      date: els.dateInput.value,
-      note: els.noteInput.value.trim()
-    });
+    const monthlyAmount = amount / monthsCovered;
+    for (let index = 0; index < monthsCovered; index += 1) {
+      ledger.entries.push({
+        id: createId("e"),
+        memberId,
+        amount: monthlyAmount,
+        date: `${addMonths(startMonth, index)}-01`
+      });
+    }
 
     els.amountInput.value = "";
-    els.noteInput.value = "";
+    els.monthsCoveredInput.value = "1";
     persist();
     render();
-    showToast("Contribution recorded.");
+    showToast(`Contribution saved for ${monthsCovered} ${monthsCovered === 1 ? "month" : "months"}.`);
   });
 
   els.membersBody.addEventListener("click", (event) => {
@@ -242,7 +247,7 @@ function renderMembers(total) {
 
 function renderEntries() {
   if (!ledger.entries.length) {
-    els.entriesBody.innerHTML = '<tr><td class="empty-row" colspan="5">No contributions recorded yet.</td></tr>';
+    els.entriesBody.innerHTML = '<tr><td class="empty-row" colspan="4">No contributions recorded yet.</td></tr>';
     return;
   }
 
@@ -251,10 +256,9 @@ function renderEntries() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((entry) => `
       <tr>
-        <td>${formatDate(entry.date)}</td>
+        <td>${formatMonth(entry.date)}</td>
         <td>${escapeHtml(memberNames.get(entry.memberId) || "Unknown")}</td>
         <td class="amount">${formatMoney(entry.amount)}</td>
-        <td class="muted">${escapeHtml(entry.note || "-")}</td>
         <td class="edit-column">
           <button class="delete-btn" type="button" data-delete-entry="${escapeHtml(entry.id)}">Delete</button>
         </td>
@@ -355,10 +359,24 @@ function formatDate(date) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(parsed);
 }
 
+function formatMonth(date) {
+  const parsed = new Date(`${date.slice(0, 7)}-01T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return new Intl.DateTimeFormat(undefined, { month: "short", year: "numeric" }).format(parsed);
+}
+
 function getCurrentMonth() {
   const today = new Date();
   const month = String(today.getMonth() + 1).padStart(2, "0");
   return `${today.getFullYear()}-${month}`;
+}
+
+function addMonths(monthValue, offset) {
+  const [year, month] = monthValue.split("-").map(Number);
+  const date = new Date(year, month - 1 + offset, 1);
+  const resultYear = date.getFullYear();
+  const resultMonth = String(date.getMonth() + 1).padStart(2, "0");
+  return `${resultYear}-${resultMonth}`;
 }
 
 function persist() {
@@ -397,8 +415,7 @@ function normalizeEntry(entry) {
     id: String(entry.id || createId("e")),
     memberId: String(entry.memberId || ""),
     amount: Number(entry.amount || 0),
-    date: String(entry.date || new Date().toISOString().slice(0, 10)),
-    note: String(entry.note || "")
+    date: String(entry.date || `${getCurrentMonth()}-01`)
   };
 }
 

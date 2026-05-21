@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Tantrum Rajin Menabung</title>
-    <link rel="stylesheet" href="styles.css?v=6" />
+    <link rel="stylesheet" href="styles.css?v=7" />
   </head>
   <body>
     <header class="topbar">
@@ -105,15 +105,15 @@
           </label>
           <label>
             Amount
-            <input id="amountInput" type="number" min="0.01" step="0.01" placeholder="25.00" required />
+            <input id="amountInput" type="number" min="0.01" step="0.01" placeholder="100000" required />
           </label>
           <label>
-            Date
-            <input id="dateInput" type="date" required />
+            Payment starts
+            <input id="paymentMonthInput" type="month" required />
           </label>
           <label>
-            Note
-            <input id="noteInput" type="text" maxlength="80" placeholder="Monthly saving" />
+            Months covered
+            <input id="monthsCoveredInput" type="number" min="1" max="12" step="1" value="1" required />
           </label>
           <button class="primary wide" type="submit">Save contribution</button>
         </form>
@@ -205,10 +205,9 @@
             <table>
               <thead>
                 <tr>
-                  <th>Date</th>
+                  <th>Paid month</th>
                   <th>Friend</th>
                   <th>Amount</th>
-                  <th>Note</th>
                   <th class="edit-column">Action</th>
                 </tr>
               </thead>
@@ -220,6 +219,6 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=6"></script>
+    <script src="script.js?v=7"></script>
   </body>
 </html>
