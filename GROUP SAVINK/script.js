@@ -1,5 +1,6 @@
 const storageKey = "tantrum-savings-ledger-v7";
 const friendModeKey = "tantrum-friend-contribution-mode";
+const readOnlyModeKey = "tantrum-read-only-tracker-mode";
 const paymentMonths = [
   ["01", "Jan"],
   ["02", "Feb"],
@@ -45,6 +46,7 @@ const blankLedger = {
 
 let ledger = loadLedger();
 let snapshotMode = false;
+let readOnlyMode = false;
 let toastTimer;
 
 const els = {
@@ -89,19 +91,31 @@ const els = {
 init();
 
 function init() {
-  if (new URLSearchParams(window.location.search).get("owner") === "1") {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("owner") === "1") {
     sessionStorage.removeItem(friendModeKey);
+    sessionStorage.removeItem(readOnlyModeKey);
     window.history.replaceState(null, "", window.location.pathname);
   }
 
   const snapshot = readSnapshotFromHash();
+  readOnlyMode = isReadOnlyUrl();
   if (snapshot) {
     ledger = snapshot;
     snapshotMode = true;
     document.body.classList.add("snapshot");
-    sessionStorage.setItem(friendModeKey, "true");
+    if (readOnlyMode) {
+      document.body.classList.add("readonly");
+      sessionStorage.setItem(readOnlyModeKey, "true");
+    } else {
+      sessionStorage.setItem(friendModeKey, "true");
+      localStorage.setItem(storageKey, JSON.stringify(ledger));
+    }
     window.history.replaceState(null, "", window.location.pathname);
-    localStorage.setItem(storageKey, JSON.stringify(ledger));
+  } else if (sessionStorage.getItem(readOnlyModeKey) === "true") {
+    snapshotMode = true;
+    readOnlyMode = true;
+    document.body.classList.add("snapshot", "readonly");
   } else if (sessionStorage.getItem(friendModeKey) === "true") {
     snapshotMode = true;
     document.body.classList.add("snapshot");
@@ -113,6 +127,7 @@ function init() {
   els.monthlyMonthInput.value = getCurrentMonth();
   bindEvents();
   render();
+  applyReadOnlyMode();
 }
 
 function bindEvents() {
@@ -210,9 +225,15 @@ function render() {
   els.currencyInput.value = ledger.currency;
   els.groupTitle.textContent = ledger.name;
   els.groupSubtitle.textContent = snapshotMode
-    ? "Choose your name and fill your contribution. Your update saves in this browser."
+    ? readOnlyMode
+      ? "This shared tracker is view-only."
+      : "Choose your name and fill your contribution. Your update saves in this browser."
     : "Track who contributes, when they paid, and how close the group is to the target.";
-  els.modeLabel.textContent = snapshotMode ? "Friend contribution link" : "Editable ledger";
+  els.modeLabel.textContent = readOnlyMode
+    ? "View-only shared tracker"
+    : snapshotMode
+      ? "Friend contribution link"
+      : "Editable ledger";
   els.totalSaved.textContent = formatMoney(total);
   els.goalText.textContent = `Goal: ${formatMoney(ledger.goal)}`;
   els.progressPercent.textContent = `${Math.round(percent)}%`;
@@ -425,6 +446,7 @@ function clearSelectedPaymentMonths() {
 }
 
 function persist() {
+  if (readOnlyMode) return;
   localStorage.setItem(storageKey, JSON.stringify(ledger));
 }
 
@@ -487,8 +509,11 @@ async function importLedger(event) {
     const text = await file.text();
     ledger = normalizeLedger(JSON.parse(text));
     snapshotMode = false;
+    readOnlyMode = false;
     document.body.classList.remove("snapshot");
+    document.body.classList.remove("readonly");
     sessionStorage.removeItem(friendModeKey);
+    sessionStorage.removeItem(readOnlyModeKey);
     window.history.replaceState(null, "", window.location.pathname);
     persist();
     render();
@@ -502,13 +527,18 @@ async function importLedger(event) {
 
 async function copyShareLink() {
   const snapshot = btoa(unescape(encodeURIComponent(JSON.stringify(ledger))));
-  const link = `${window.location.origin}${window.location.pathname}#snapshot=${snapshot}`;
+  const link = `${window.location.origin}${window.location.pathname}?view=1#snapshot=${snapshot}`;
   try {
     await navigator.clipboard.writeText(link);
-    showToast("Editable contribution link copied.");
+    showToast("View-only share link copied.");
   } catch {
     showToast("Copy failed. Export the ledger instead.");
   }
+}
+
+function isReadOnlyUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("view") === "1" || params.get("readonly") === "1";
 }
 
 function readSnapshotFromHash() {
@@ -520,6 +550,33 @@ function readSnapshotFromHash() {
     showToast("The shared snapshot link is not valid.");
     return null;
   }
+}
+
+function applyReadOnlyMode() {
+  if (!readOnlyMode) return;
+
+  [
+    els.loadSampleBtn,
+    els.exportBtn,
+    els.shareBtn,
+    els.importInput,
+    els.nameInput,
+    els.goalInput,
+    els.monthlyDueInput,
+    els.currencyInput,
+    els.memberNameInput,
+    els.contributorInput,
+    els.amountInput,
+    els.paymentYearInput
+  ].forEach((element) => {
+    if (element) element.disabled = true;
+  });
+
+  document
+    .querySelectorAll('input[name="paymentMonths"], #monthlyMonthInput')
+    .forEach((element) => {
+      element.disabled = true;
+    });
 }
 
 function showToast(message) {

@@ -518,6 +518,18 @@ body.snapshot #shareBtn {
   display: none;
 }
 
+body.readonly .top-actions,
+body.readonly .controls-grid,
+body.readonly .edit-column {
+  display: none;
+}
+
+body.readonly input,
+body.readonly select,
+body.readonly button {
+  cursor: default;
+}
+
 body.snapshot .controls-grid {
   grid-template-columns: minmax(0, 520px);
 }
