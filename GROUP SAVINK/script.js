@@ -1,6 +1,22 @@
-const storageKey = "tantrum-savings-ledger-v7";
-const friendModeKey = "tantrum-friend-contribution-mode";
-const readOnlyModeKey = "tantrum-read-only-tracker-mode";
+const defaultLedger = {
+  name: "Tantrum's Money",
+  goal: 10000000,
+  monthlyDue: 50000,
+  currency: "IDR"
+};
+
+const defaultMembers = [
+  { id: "m-1", name: "Naylah Joestar" },
+  { id: "m-2", name: "Arsyifa" },
+  { id: "m-3", name: "Mila" },
+  { id: "m-4", name: "Ditha" },
+  { id: "m-5", name: "Dwi Kurnia" },
+  { id: "m-6", name: "Vanka" },
+  { id: "m-7", name: "Selvi" },
+  { id: "m-8", name: "Salma" },
+  { id: "m-9", name: "Zata" }
+];
+
 const paymentMonths = [
   ["01", "Jan"],
   ["02", "Feb"],
@@ -16,55 +32,43 @@ const paymentMonths = [
   ["12", "Dec"]
 ];
 
-const sampleLedger = {
-  name: "Tantrum's Money",
-  goal: 10000000,
-  monthlyDue: 50000,
-  currency: "IDR",
-  members: [
-    { id: "m-1", name: "Naylah Joestar" },
-    { id: "m-2", name: "Arsyifa" },
-    { id: "m-3", name: "Mila" },
-    { id: "m-4", name: "Ditha" },
-    { id: "m-5", name: "Dwi Kurnia" },
-    { id: "m-6", name: "Vanka" },
-    { id: "m-7", name: "Selvi" },
-    { id: "m-8", name: "Salma" },
-    { id: "m-9", name: "Zata" }
-  ],
-  entries: createInitialEntries()
+const state = {
+  supabase: null,
+  configured: false,
+  user: null,
+  group: null,
+  role: "viewer",
+  groupMember: null,
+  members: [],
+  payments: [],
+  publicView: false,
+  invite: null
 };
-
-const blankLedger = {
-  name: "Tantrum's Money",
-  goal: 10000000,
-  monthlyDue: 50000,
-  currency: "IDR",
-  members: sampleLedger.members.map((member) => ({ ...member })),
-  entries: createInitialEntries()
-};
-
-let ledger = loadLedger();
-let snapshotMode = false;
-let readOnlyMode = false;
-let toastTimer;
 
 const els = {
   amountInput: document.querySelector("#amountInput"),
+  authForm: document.querySelector("#authForm"),
+  authPanel: document.querySelector("#authPanel"),
+  contributionForm: document.querySelector("#contributionForm"),
   contributorInput: document.querySelector("#contributorInput"),
+  copyAdminLinkBtn: document.querySelector("#copyAdminLinkBtn"),
+  copyMemberLinkBtn: document.querySelector("#copyMemberLinkBtn"),
+  copyViewLinkBtn: document.querySelector("#copyViewLinkBtn"),
+  createGroupBtn: document.querySelector("#createGroupBtn"),
   currencyInput: document.querySelector("#currencyInput"),
+  emailInput: document.querySelector("#emailInput"),
   entriesBody: document.querySelector("#entriesBody"),
   entryCount: document.querySelector("#entryCount"),
-  exportBtn: document.querySelector("#exportBtn"),
   goalInput: document.querySelector("#goalInput"),
   goalText: document.querySelector("#goalText"),
+  groupLinkText: document.querySelector("#groupLinkText"),
   groupSubtitle: document.querySelector("#groupSubtitle"),
   groupTitle: document.querySelector("#groupTitle"),
-  importInput: document.querySelector("#importInput"),
-  loadSampleBtn: document.querySelector("#loadSampleBtn"),
   memberCount: document.querySelector("#memberCount"),
+  memberForm: document.querySelector("#memberForm"),
   memberNameInput: document.querySelector("#memberNameInput"),
   membersBody: document.querySelector("#membersBody"),
+  modeLabel: document.querySelector("#modeLabel"),
   monthlyBody: document.querySelector("#monthlyBody"),
   monthlyCollected: document.querySelector("#monthlyCollected"),
   monthlyDueInput: document.querySelector("#monthlyDueInput"),
@@ -74,172 +78,463 @@ const els = {
   monthlyProgressText: document.querySelector("#monthlyProgressText"),
   monthlySummary: document.querySelector("#monthlySummary"),
   monthlyTarget: document.querySelector("#monthlyTarget"),
-  modeLabel: document.querySelector("#modeLabel"),
-  nameInput: document.querySelector("#nameInput"),
+  passwordInput: document.querySelector("#passwordInput"),
   paymentMonthsGroup: document.querySelector("#paymentMonthsGroup"),
   paymentYearInput: document.querySelector("#paymentYearInput"),
   progressFill: document.querySelector("#progressFill"),
   progressPercent: document.querySelector("#progressPercent"),
+  refreshBtn: document.querySelector("#refreshBtn"),
+  roleLabel: document.querySelector("#roleLabel"),
+  sessionPanel: document.querySelector("#sessionPanel"),
+  sessionText: document.querySelector("#sessionText"),
   settingsForm: document.querySelector("#settingsForm"),
-  memberForm: document.querySelector("#memberForm"),
-  contributionForm: document.querySelector("#contributionForm"),
+  setupPanel: document.querySelector("#setupPanel"),
   shareBtn: document.querySelector("#shareBtn"),
+  sharePanel: document.querySelector("#sharePanel"),
+  signOutBtn: document.querySelector("#signOutBtn"),
+  signUpBtn: document.querySelector("#signUpBtn"),
   toast: document.querySelector("#toast"),
   totalSaved: document.querySelector("#totalSaved")
 };
 
+let toastTimer;
+
 init();
 
-function init() {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("owner") === "1") {
-    sessionStorage.removeItem(friendModeKey);
-    sessionStorage.removeItem(readOnlyModeKey);
-    window.history.replaceState(null, "", window.location.pathname);
-  }
-
-  const snapshot = readSnapshotFromHash();
-  readOnlyMode = isReadOnlyUrl();
-  if (snapshot) {
-    ledger = snapshot;
-    snapshotMode = true;
-    document.body.classList.add("snapshot");
-    if (readOnlyMode) {
-      document.body.classList.add("readonly");
-      sessionStorage.setItem(readOnlyModeKey, "true");
-    } else {
-      sessionStorage.setItem(friendModeKey, "true");
-      localStorage.setItem(storageKey, JSON.stringify(ledger));
-    }
-    window.history.replaceState(null, "", window.location.pathname);
-  } else if (sessionStorage.getItem(readOnlyModeKey) === "true") {
-    snapshotMode = true;
-    readOnlyMode = true;
-    document.body.classList.add("snapshot", "readonly");
-  } else if (sessionStorage.getItem(friendModeKey) === "true") {
-    snapshotMode = true;
-    document.body.classList.add("snapshot");
-  }
-
+async function init() {
   renderPaymentMonthOptions();
   els.paymentYearInput.value = getCurrentYear();
   setDefaultPaymentMonth();
   els.monthlyMonthInput.value = getCurrentMonth();
   bindEvents();
-  render();
-  applyReadOnlyMode();
+
+  state.configured = configureSupabase();
+  if (!state.configured) {
+    els.setupPanel.hidden = false;
+    renderEmpty();
+    applyPermissions();
+    return;
+  }
+
+  const { data } = await state.supabase.auth.getSession();
+  state.user = data.session?.user || null;
+
+  state.supabase.auth.onAuthStateChange(async (_event, session) => {
+    state.user = session?.user || null;
+    await loadApp();
+  });
+
+  await loadApp();
+}
+
+function configureSupabase() {
+  const config = window.SUPABASE_CONFIG || {};
+  if (!window.supabase || !config.url || !config.anonKey || config.url.includes("YOUR_")) {
+    return false;
+  }
+  state.supabase = window.supabase.createClient(config.url, config.anonKey);
+  return true;
 }
 
 function bindEvents() {
-  els.settingsForm.addEventListener("submit", (event) => {
+  els.authForm.addEventListener("submit", async (event) => {
     event.preventDefault();
-    ledger.name = els.nameInput.value.trim() || blankLedger.name;
-    ledger.goal = Number(els.goalInput.value) || 0;
-    ledger.monthlyDue = Number(els.monthlyDueInput.value) || 0;
-    ledger.currency = els.currencyInput.value;
-    persist();
-    render();
-    showToast("Group details saved.");
+    await signIn();
   });
-
-  els.memberForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const name = els.memberNameInput.value.trim();
-    if (!name) return;
-    ledger.members.push({ id: createId("m"), name });
-    els.memberNameInput.value = "";
-    persist();
-    render();
-    showToast(`${name} added.`);
-  });
-
-  els.contributionForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const memberId = els.contributorInput.value;
-    const amount = Number(els.amountInput.value);
-    const paymentYear = Number(els.paymentYearInput.value);
-    const selectedMonths = getSelectedPaymentMonths();
-    if (!memberId || !amount || !paymentYear || !selectedMonths.length) {
-      showToast("Choose at least one paid month.");
-      return;
-    }
-
-    const monthlyAmount = amount / selectedMonths.length;
-    selectedMonths.forEach((month) => {
-      ledger.entries.push({
-        id: createId("e"),
-        memberId,
-        amount: monthlyAmount,
-        date: `${paymentYear}-${month}-01`
-      });
-    });
-
-    els.amountInput.value = "";
-    clearSelectedPaymentMonths();
-    persist();
-    render();
-    showToast(`Contribution saved for ${selectedMonths.length} ${selectedMonths.length === 1 ? "month" : "months"}.`);
-  });
-
-  els.membersBody.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-delete-member]");
-    if (!button) return;
-    const memberId = button.dataset.deleteMember;
-    const member = ledger.members.find((item) => item.id === memberId);
-    ledger.members = ledger.members.filter((item) => item.id !== memberId);
-    ledger.entries = ledger.entries.filter((item) => item.memberId !== memberId);
-    persist();
-    render();
-    showToast(`${member?.name || "Friend"} removed.`);
-  });
-
-  els.entriesBody.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-delete-entry]");
-    if (!button) return;
-    ledger.entries = ledger.entries.filter((entry) => entry.id !== button.dataset.deleteEntry);
-    persist();
-    render();
-    showToast("Contribution deleted.");
-  });
-
-  els.loadSampleBtn.addEventListener("click", () => {
-    ledger = structuredClone(sampleLedger);
-    persist();
-    render();
-    showToast("Sample ledger loaded.");
-  });
-
-  els.exportBtn.addEventListener("click", exportLedger);
-  els.shareBtn.addEventListener("click", copyShareLink);
-  els.importInput.addEventListener("change", importLedger);
+  els.signUpBtn.addEventListener("click", signUp);
+  els.signOutBtn.addEventListener("click", signOut);
+  els.createGroupBtn.addEventListener("click", createGroup);
+  els.refreshBtn.addEventListener("click", loadApp);
+  els.shareBtn.addEventListener("click", copyViewLink);
+  els.copyViewLinkBtn.addEventListener("click", copyViewLink);
+  els.copyAdminLinkBtn.addEventListener("click", () => copyInviteLink("admin"));
+  els.copyMemberLinkBtn.addEventListener("click", () => copyInviteLink("member"));
   els.monthlyMonthInput.addEventListener("change", renderMonthlyCheck);
+  els.settingsForm.addEventListener("submit", saveSettings);
+  els.memberForm.addEventListener("submit", addMember);
+  els.contributionForm.addEventListener("submit", addPayment);
+  els.membersBody.addEventListener("click", deleteMemberFromClick);
+  els.entriesBody.addEventListener("click", deletePaymentFromClick);
 }
 
-function render() {
-  const total = getTotalSaved();
-  const percent = ledger.goal > 0 ? Math.min((total / ledger.goal) * 100, 100) : 0;
+async function loadApp() {
+  if (!state.configured) return;
 
-  els.nameInput.value = ledger.name;
-  els.goalInput.value = ledger.goal;
-  els.monthlyDueInput.value = ledger.monthlyDue || "";
-  els.currencyInput.value = ledger.currency;
-  els.groupTitle.textContent = ledger.name;
-  els.groupSubtitle.textContent = snapshotMode
-    ? readOnlyMode
-      ? "This shared tracker is view-only."
-      : "Choose your name and fill your contribution. Your update saves in this browser."
-    : "Track who contributes, when they paid, and how close the group is to the target.";
-  els.modeLabel.textContent = readOnlyMode
-    ? "View-only shared tracker"
-    : snapshotMode
-      ? "Friend contribution link"
-      : "Editable ledger";
+  const params = getParams();
+  state.publicView = Boolean(params.viewToken);
+  state.group = null;
+  state.groupMember = null;
+  state.members = [];
+  state.payments = [];
+  state.role = "viewer";
+
+  if (params.viewToken && params.groupShortId) {
+    await loadPublicTracker(params.groupShortId, params.viewToken);
+  } else if (state.user && params.groupShortId) {
+    await handleInvite(params);
+    await loadPrivateTracker(params.groupShortId);
+  } else if (state.user) {
+    await loadFirstUserTracker();
+  }
+
+  renderAll();
+  applyPermissions();
+}
+
+function getParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    groupShortId: params.get("g") || params.get("group"),
+    inviteToken: params.get("invite"),
+    viewToken: params.get("view")
+  };
+}
+
+async function loadPublicTracker(groupShortId, viewToken) {
+  const { data, error } = await state.supabase.rpc("get_public_tracker", {
+    p_short_id: groupShortId,
+    p_view_token: viewToken
+  });
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  assignTrackerPayload(data);
+  state.publicView = true;
+  state.role = "viewer";
+}
+
+async function handleInvite(params) {
+  if (!params.inviteToken) return;
+
+  const { data: existing } = await state.supabase
+    .from("groups")
+    .select("id, group_members(role, member_id)")
+    .eq("short_id", params.groupShortId)
+    .maybeSingle();
+  if (existing?.group_members?.length) return;
+
+  const inviteInfo = await getInviteInfo(params.groupShortId, params.inviteToken);
+  let memberId = null;
+  if (inviteInfo?.role === "member") {
+    memberId = promptMemberChoice(inviteInfo.members || []);
+    if (!memberId) {
+      showToast("Choose a member before joining.");
+      return;
+    }
+  }
+
+  const { error } = await state.supabase.rpc("join_group_with_invite", {
+    p_short_id: params.groupShortId,
+    p_token: params.inviteToken,
+    p_member_id: memberId
+  });
+  if (error) showToast(error.message);
+}
+
+async function getInviteInfo(groupShortId, token) {
+  const { data, error } = await state.supabase.rpc("get_invite_info", {
+    p_short_id: groupShortId,
+    p_token: token
+  });
+  if (error) {
+    showToast(error.message);
+    return null;
+  }
+  return data;
+}
+
+function promptMemberChoice(members) {
+  if (!members.length) return null;
+  const list = members.map((member, index) => `${index + 1}. ${member.name}`).join("\n");
+  const answer = window.prompt(`Which member are you?\n${list}`);
+  const index = Number(answer) - 1;
+  return members[index]?.id || null;
+}
+
+async function loadPrivateTracker(groupShortId) {
+  const { data: group, error: groupError } = await state.supabase
+    .from("groups")
+    .select("id, short_id, name, goal, monthly_due, currency, view_token")
+    .eq("short_id", groupShortId)
+    .maybeSingle();
+  if (groupError) {
+    showToast(groupError.message);
+    return;
+  }
+  if (!group) return;
+
+  state.group = group;
+  await loadRole(group.id);
+  await loadMembersAndPayments(group.id);
+}
+
+async function loadFirstUserTracker() {
+  const { data, error } = await state.supabase
+    .from("group_members")
+    .select("role, member_id, groups(id, short_id, name, goal, monthly_due, currency, view_token)")
+    .eq("user_id", state.user.id)
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  if (!data?.groups) return;
+
+  state.group = data.groups;
+  state.role = data.role;
+  state.groupMember = data;
+  setUrlGroup(state.group.short_id);
+  await loadMembersAndPayments(state.group.id);
+}
+
+async function loadRole(groupId) {
+  const { data, error } = await state.supabase
+    .from("group_members")
+    .select("role, member_id")
+    .eq("group_id", groupId)
+    .eq("user_id", state.user.id)
+    .maybeSingle();
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  state.groupMember = data || null;
+  state.role = data?.role || "viewer";
+}
+
+async function loadMembersAndPayments(groupId) {
+  const [{ data: members, error: membersError }, { data: payments, error: paymentsError }] = await Promise.all([
+    state.supabase.from("members").select("id, name").eq("group_id", groupId).order("name"),
+    state.supabase.from("payments").select("id, member_id, created_by, amount, paid_month").eq("group_id", groupId).order("paid_month", { ascending: false })
+  ]);
+  if (membersError || paymentsError) {
+    showToast(membersError?.message || paymentsError?.message);
+    return;
+  }
+  state.members = members || [];
+  state.payments = (payments || []).map((payment) => ({
+    id: payment.id,
+    memberId: payment.member_id,
+    createdBy: payment.created_by,
+    amount: Number(payment.amount),
+    date: payment.paid_month
+  }));
+}
+
+function assignTrackerPayload(payload) {
+  state.group = payload.group;
+  state.members = payload.members || [];
+  state.payments = (payload.payments || []).map((payment) => ({
+    id: payment.id,
+    memberId: payment.member_id,
+    createdBy: payment.created_by,
+    amount: Number(payment.amount),
+    date: payment.paid_month
+  }));
+}
+
+async function signIn() {
+  const { error } = await state.supabase.auth.signInWithPassword({
+    email: els.emailInput.value,
+    password: els.passwordInput.value
+  });
+  if (error) showToast(error.message);
+}
+
+async function signUp() {
+  const { error } = await state.supabase.auth.signUp({
+    email: els.emailInput.value,
+    password: els.passwordInput.value
+  });
+  showToast(error ? error.message : "Account created. Check email if confirmation is enabled.");
+}
+
+async function signOut() {
+  await state.supabase.auth.signOut();
+  state.user = null;
+  state.group = null;
+  state.members = [];
+  state.payments = [];
+  state.role = "viewer";
+  renderAll();
+  applyPermissions();
+}
+
+async function createGroup() {
+  const { data, error } = await state.supabase.rpc("create_default_tantrum_group");
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  setUrlGroup(data.short_id);
+  await loadPrivateTracker(data.short_id);
+  renderAll();
+  applyPermissions();
+  showToast("Supabase tracker created.");
+}
+
+async function saveSettings(event) {
+  event.preventDefault();
+  if (!canAdmin()) return;
+  const { error } = await state.supabase
+    .from("groups")
+    .update({
+      name: els.nameInput.value.trim(),
+      goal: Number(els.goalInput.value) || 0,
+      monthly_due: Number(els.monthlyDueInput.value) || 0,
+      currency: els.currencyInput.value
+    })
+    .eq("id", state.group.id);
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  await loadPrivateTracker(state.group.short_id);
+  renderAll();
+  showToast("Group details saved.");
+}
+
+async function addMember(event) {
+  event.preventDefault();
+  if (!canAdmin()) return;
+  const name = els.memberNameInput.value.trim();
+  if (!name) return;
+  const { error } = await state.supabase.from("members").insert({
+    group_id: state.group.id,
+    name
+  });
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  els.memberNameInput.value = "";
+  await reloadTracker();
+  showToast(`${name} added.`);
+}
+
+async function addPayment(event) {
+  event.preventDefault();
+  if (!canAddPayment()) return;
+  const memberId = canAdmin() ? els.contributorInput.value : state.groupMember?.member_id;
+  const amount = Number(els.amountInput.value);
+  const year = Number(els.paymentYearInput.value);
+  const selectedMonths = getSelectedPaymentMonths();
+  if (!memberId || !amount || !year || !selectedMonths.length) {
+    showToast("Choose a friend, amount, year, and month.");
+    return;
+  }
+
+  const monthlyAmount = amount / selectedMonths.length;
+  const rows = selectedMonths.map((month) => ({
+    group_id: state.group.id,
+    member_id: memberId,
+    amount: monthlyAmount,
+    paid_month: `${year}-${month}-01`
+  }));
+
+  const { error } = await state.supabase.from("payments").insert(rows);
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  els.amountInput.value = "";
+  clearSelectedPaymentMonths();
+  await reloadTracker();
+  showToast(`Payment saved for ${selectedMonths.length} ${selectedMonths.length === 1 ? "month" : "months"}.`);
+}
+
+async function deleteMemberFromClick(event) {
+  const button = event.target.closest("[data-delete-member]");
+  if (!button || !canAdmin()) return;
+  const { error } = await state.supabase.from("members").delete().eq("id", button.dataset.deleteMember);
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  await reloadTracker();
+}
+
+async function deletePaymentFromClick(event) {
+  const editButton = event.target.closest("[data-edit-entry]");
+  if (editButton) {
+    await editPayment(editButton.dataset.editEntry);
+    return;
+  }
+
+  const button = event.target.closest("[data-delete-entry]");
+  if (!button) return;
+  const payment = state.payments.find((item) => item.id === button.dataset.deleteEntry);
+  if (!payment || !canEditPayment(payment)) return;
+  const { error } = await state.supabase.from("payments").delete().eq("id", payment.id);
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  await reloadTracker();
+}
+
+async function editPayment(paymentId) {
+  const payment = state.payments.find((item) => item.id === paymentId);
+  if (!payment || !canEditPayment(payment)) return;
+
+  const nextAmount = Number(window.prompt("New amount", String(payment.amount)));
+  if (!nextAmount) return;
+  const nextMonth = window.prompt("Paid month (YYYY-MM)", payment.date.slice(0, 7));
+  if (!/^\d{4}-\d{2}$/.test(nextMonth || "")) {
+    showToast("Use YYYY-MM format.");
+    return;
+  }
+
+  const { error } = await state.supabase
+    .from("payments")
+    .update({
+      amount: nextAmount,
+      paid_month: `${nextMonth}-01`
+    })
+    .eq("id", payment.id);
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  await reloadTracker();
+  showToast("Payment updated.");
+}
+
+async function reloadTracker() {
+  if (!state.group?.short_id) return;
+  if (state.publicView) {
+    const params = getParams();
+    await loadPublicTracker(params.groupShortId, params.viewToken);
+  } else {
+    await loadPrivateTracker(state.group.short_id);
+  }
+  renderAll();
+  applyPermissions();
+}
+
+function renderAll() {
+  const group = state.group || defaultLedger;
+  const total = getTotalSaved();
+  const percent = group.goal > 0 ? Math.min((total / group.goal) * 100, 100) : 0;
+
+  els.nameInput.value = group.name;
+  els.goalInput.value = group.goal;
+  els.monthlyDueInput.value = group.monthly_due ?? group.monthlyDue;
+  els.currencyInput.value = group.currency;
+  els.groupTitle.textContent = group.name;
+  els.groupSubtitle.textContent = getSubtitle();
+  els.modeLabel.textContent = getModeLabel();
   els.totalSaved.textContent = formatMoney(total);
-  els.goalText.textContent = `Goal: ${formatMoney(ledger.goal)}`;
+  els.goalText.textContent = `Goal: ${formatMoney(group.goal)}`;
   els.progressPercent.textContent = `${Math.round(percent)}%`;
   els.progressFill.style.width = `${percent}%`;
-  els.memberCount.textContent = `${ledger.members.length} ${ledger.members.length === 1 ? "friend" : "friends"}`;
-  els.entryCount.textContent = `${ledger.entries.length} ${ledger.entries.length === 1 ? "record" : "records"}`;
+  els.memberCount.textContent = `${state.members.length} ${state.members.length === 1 ? "friend" : "friends"}`;
+  els.entryCount.textContent = `${state.payments.length} ${state.payments.length === 1 ? "record" : "records"}`;
+  els.roleLabel.textContent = state.user ? state.role : "Not signed in";
+  els.sessionText.textContent = getSessionText();
+  els.groupLinkText.textContent = state.group ? `Group ID: ${state.group.short_id}` : "Links appear after the tracker loads.";
 
   renderContributorOptions();
   renderMembers(total);
@@ -247,15 +542,24 @@ function render() {
   renderEntries();
 }
 
+function renderEmpty() {
+  state.group = defaultLedger;
+  state.members = [];
+  state.payments = [];
+  renderAll();
+}
+
 function renderContributorOptions() {
-  if (!ledger.members.length) {
-    els.contributorInput.innerHTML = '<option value="">Add a friend first</option>';
-    els.contributorInput.disabled = true;
+  const allowedMembers = canAdmin()
+    ? state.members
+    : state.members.filter((member) => member.id === state.groupMember?.member_id);
+
+  if (!allowedMembers.length) {
+    els.contributorInput.innerHTML = '<option value="">No member assigned</option>';
     return;
   }
 
-  els.contributorInput.disabled = false;
-  els.contributorInput.innerHTML = ledger.members
+  els.contributorInput.innerHTML = allowedMembers
     .map((member) => `<option value="${escapeHtml(member.id)}">${escapeHtml(member.name)}</option>`)
     .join("");
 }
@@ -272,12 +576,12 @@ function renderPaymentMonthOptions() {
 }
 
 function renderMembers(total) {
-  if (!ledger.members.length) {
-    els.membersBody.innerHTML = '<tr><td class="empty-row" colspan="4">No friends added yet.</td></tr>';
+  if (!state.members.length) {
+    els.membersBody.innerHTML = '<tr><td class="empty-row" colspan="4">No members yet.</td></tr>';
     return;
   }
 
-  els.membersBody.innerHTML = ledger.members
+  els.membersBody.innerHTML = state.members
     .map((member) => {
       const contributed = getMemberTotal(member.id);
       const share = total > 0 ? Math.round((contributed / total) * 100) : 0;
@@ -287,7 +591,7 @@ function renderMembers(total) {
           <td class="amount">${formatMoney(contributed)}</td>
           <td>${share}%</td>
           <td class="edit-column">
-            <button class="delete-btn" type="button" data-delete-member="${escapeHtml(member.id)}">Remove</button>
+            ${canAdmin() ? `<button class="delete-btn" type="button" data-delete-member="${escapeHtml(member.id)}">Remove</button>` : ""}
           </td>
         </tr>
       `;
@@ -296,21 +600,26 @@ function renderMembers(total) {
 }
 
 function renderEntries() {
-  if (!ledger.entries.length) {
-    els.entriesBody.innerHTML = '<tr><td class="empty-row" colspan="4">No contributions recorded yet.</td></tr>';
+  if (!state.payments.length) {
+    els.entriesBody.innerHTML = '<tr><td class="empty-row" colspan="4">No payments recorded yet.</td></tr>';
     return;
   }
 
-  const memberNames = new Map(ledger.members.map((member) => [member.id, member.name]));
-  els.entriesBody.innerHTML = [...ledger.entries]
+  const memberNames = new Map(state.members.map((member) => [member.id, member.name]));
+  els.entriesBody.innerHTML = [...state.payments]
     .sort((a, b) => b.date.localeCompare(a.date))
-    .map((entry) => `
+    .map((payment) => `
       <tr>
-        <td>${formatMonth(entry.date)}</td>
-        <td>${escapeHtml(memberNames.get(entry.memberId) || "Unknown")}</td>
-        <td class="amount">${formatMoney(entry.amount)}</td>
+        <td>${formatMonth(payment.date)}</td>
+        <td>${escapeHtml(memberNames.get(payment.memberId) || "Unknown")}</td>
+        <td class="amount">${formatMoney(payment.amount)}</td>
         <td class="edit-column">
-          <button class="delete-btn" type="button" data-delete-entry="${escapeHtml(entry.id)}">Delete</button>
+          ${
+            canEditPayment(payment)
+              ? `<button class="secondary mini-btn" type="button" data-edit-entry="${escapeHtml(payment.id)}">Edit</button>
+                 <button class="delete-btn" type="button" data-delete-entry="${escapeHtml(payment.id)}">Delete</button>`
+              : ""
+          }
         </td>
       </tr>
     `)
@@ -319,28 +628,23 @@ function renderEntries() {
 
 function renderMonthlyCheck() {
   const month = els.monthlyMonthInput.value || getCurrentMonth();
-  const expected = Number(ledger.monthlyDue || 0);
+  const expected = Number(state.group?.monthly_due ?? state.group?.monthlyDue ?? defaultLedger.monthlyDue);
 
-  if (!ledger.members.length) {
+  if (!state.members.length) {
     els.monthlySummary.innerHTML = "<span>0 paid</span><span>0 partial</span><span>0 unpaid</span>";
     els.monthlyCollected.textContent = formatMoney(0);
     els.monthlyTarget.textContent = formatMoney(0);
     els.monthlyProgressText.textContent = "0% paid";
-    els.monthlyPeopleText.textContent = "0 of 0 friends";
+    els.monthlyPeopleText.textContent = "0 of 0 members";
     els.monthlyProgressFill.style.width = "0%";
-    els.monthlyBody.innerHTML = '<tr><td class="empty-row" colspan="5">Add friends to check monthly payments.</td></tr>';
+    els.monthlyBody.innerHTML = '<tr><td class="empty-row" colspan="5">No members to check.</td></tr>';
     return;
   }
 
-  const rows = ledger.members.map((member) => {
-    const monthEntries = ledger.entries.filter((entry) => {
-      return entry.memberId === member.id && entry.date?.startsWith(month);
-    });
-    const paid = monthEntries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
-    const lastPayment = monthEntries
-      .map((entry) => entry.date)
-      .sort()
-      .pop();
+  const rows = state.members.map((member) => {
+    const monthEntries = state.payments.filter((payment) => payment.memberId === member.id && payment.date?.startsWith(month));
+    const paid = monthEntries.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+    const lastPayment = monthEntries.map((payment) => payment.date).sort().pop();
     const status = getMonthlyStatus(paid, expected);
     return { member, paid, lastPayment, status };
   });
@@ -349,9 +653,8 @@ function renderMonthlyCheck() {
   const partialCount = rows.filter((row) => row.status.kind === "partial").length;
   const unpaidCount = rows.filter((row) => row.status.kind === "unpaid").length;
   const collected = rows.reduce((sum, row) => sum + row.paid, 0);
-  const monthlyTarget = expected > 0 ? expected * ledger.members.length : collected;
+  const monthlyTarget = expected > 0 ? expected * state.members.length : collected;
   const amountProgress = monthlyTarget > 0 ? Math.min((collected / monthlyTarget) * 100, 100) : 0;
-  const peopleProgress = ledger.members.length > 0 ? Math.round((paidCount / ledger.members.length) * 100) : 0;
 
   els.monthlySummary.innerHTML = `
     <span>${paidCount} paid</span>
@@ -361,9 +664,8 @@ function renderMonthlyCheck() {
   els.monthlyCollected.textContent = formatMoney(collected);
   els.monthlyTarget.textContent = expected > 0 ? formatMoney(monthlyTarget) : "Set monthly amount";
   els.monthlyProgressText.textContent = `${Math.round(amountProgress)}% paid`;
-  els.monthlyPeopleText.textContent = `${paidCount} of ${ledger.members.length} friends`;
-  els.monthlyProgressFill.style.width = `${expected > 0 ? amountProgress : peopleProgress}%`;
-
+  els.monthlyPeopleText.textContent = `${paidCount} of ${state.members.length} members`;
+  els.monthlyProgressFill.style.width = `${amountProgress}%`;
   els.monthlyBody.innerHTML = rows
     .map((row) => `
       <tr>
@@ -377,6 +679,98 @@ function renderMonthlyCheck() {
     .join("");
 }
 
+function applyPermissions() {
+  const configured = state.configured;
+  const signedIn = Boolean(state.user);
+  const admin = canAdmin();
+  const addPaymentAllowed = canAddPayment();
+  const readonly = state.publicView || !configured;
+
+  els.authPanel.hidden = state.publicView;
+  els.setupPanel.hidden = configured;
+  els.settingsForm.hidden = !admin;
+  els.memberForm.hidden = !admin;
+  els.sharePanel.hidden = !state.group || (!admin && !state.publicView);
+  els.createGroupBtn.hidden = !signedIn || Boolean(state.group);
+  els.signOutBtn.hidden = !signedIn;
+  els.authForm.hidden = signedIn;
+  els.contributionForm.hidden = !addPaymentAllowed;
+  els.shareBtn.disabled = !state.group;
+  els.copyAdminLinkBtn.hidden = !admin;
+  els.copyMemberLinkBtn.hidden = !admin;
+  els.copyViewLinkBtn.disabled = !state.group;
+  els.refreshBtn.disabled = !configured;
+  els.monthlyMonthInput.disabled = false;
+
+  document.body.classList.toggle("readonly", readonly || state.role === "viewer");
+  document.body.classList.toggle("admin", admin);
+  document.body.classList.toggle("member", state.role === "member");
+}
+
+function getModeLabel() {
+  if (state.publicView) return "View-only shared tracker";
+  if (!state.user) return "Login required";
+  if (!state.group) return "No tracker selected";
+  return `${state.role} access`;
+}
+
+function getSubtitle() {
+  if (state.publicView) return "This shared tracker is view-only.";
+  if (!state.user) return "Sign in to view or update the savings tracker.";
+  if (!state.group) return "Create or open a group link to begin.";
+  if (canAdmin()) return "Admin can manage settings, members, and all payments.";
+  if (state.role === "member") return "Members can add and manage only their own payments.";
+  return "Viewers can see the tracker but cannot edit anything.";
+}
+
+function getSessionText() {
+  if (!state.configured) return "Connect Supabase first.";
+  if (!state.user) return "Use email and password to sign in or create an account.";
+  if (!state.group) return `Signed in as ${state.user.email}. Create or open a tracker.`;
+  return `Signed in as ${state.user.email}. Current role: ${state.role}.`;
+}
+
+function canAdmin() {
+  return state.role === "admin";
+}
+
+function canAddPayment() {
+  return Boolean(state.group) && (canAdmin() || (state.role === "member" && state.groupMember?.member_id));
+}
+
+function canEditPayment(payment) {
+  if (canAdmin()) return true;
+  return state.role === "member" && payment.createdBy === state.user?.id;
+}
+
+async function copyInviteLink(role) {
+  if (!canAdmin()) return;
+  const { data, error } = await state.supabase.rpc("create_group_invite", {
+    p_group_id: state.group.id,
+    p_role: role
+  });
+  if (error) {
+    showToast(error.message);
+    return;
+  }
+  await copyText(`${window.location.origin}${window.location.pathname}?g=${state.group.short_id}&invite=${data.token}`);
+  showToast(`${role} invite link copied.`);
+}
+
+async function copyViewLink() {
+  if (!state.group) return;
+  await copyText(`${window.location.origin}${window.location.pathname}?g=${state.group.short_id}&view=${state.group.view_token}`);
+  showToast("View-only link copied.");
+}
+
+async function copyText(text) {
+  await navigator.clipboard.writeText(text);
+}
+
+function setUrlGroup(shortId) {
+  window.history.replaceState(null, "", `${window.location.pathname}?g=${shortId}`);
+}
+
 function getMonthlyStatus(paid, expected) {
   if (expected > 0 && paid >= expected) return { kind: "paid", label: "Paid" };
   if (expected > 0 && paid > 0) return { kind: "partial", label: "Partial" };
@@ -385,21 +779,22 @@ function getMonthlyStatus(paid, expected) {
 }
 
 function getTotalSaved() {
-  return ledger.entries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  return state.payments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 }
 
 function getMemberTotal(memberId) {
-  return ledger.entries
-    .filter((entry) => entry.memberId === memberId)
-    .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  return state.payments
+    .filter((payment) => payment.memberId === memberId)
+    .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
 }
 
 function formatMoney(value) {
-  const locale = ledger.currency === "IDR" ? "id-ID" : undefined;
+  const currency = state.group?.currency || defaultLedger.currency;
+  const locale = currency === "IDR" ? "id-ID" : undefined;
   return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: ledger.currency || "IDR",
-    maximumFractionDigits: ledger.currency === "IDR" ? 0 : 2
+    currency,
+    maximumFractionDigits: currency === "IDR" ? 0 : 2
   }).format(Number(value || 0));
 }
 
@@ -417,8 +812,7 @@ function formatMonth(date) {
 
 function getCurrentMonth() {
   const today = new Date();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  return `${today.getFullYear()}-${month}`;
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function getCurrentYear() {
@@ -445,145 +839,11 @@ function clearSelectedPaymentMonths() {
     });
 }
 
-function persist() {
-  if (readOnlyMode) return;
-  localStorage.setItem(storageKey, JSON.stringify(ledger));
-}
-
-function loadLedger() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(storageKey));
-    return saved ? normalizeLedger(saved) : structuredClone(blankLedger);
-  } catch {
-    return structuredClone(blankLedger);
-  }
-}
-
-function normalizeLedger(value) {
-  return {
-    name: String(value.name || blankLedger.name),
-    goal: Number(value.goal || blankLedger.goal),
-    monthlyDue: Number(value.monthlyDue || blankLedger.monthlyDue),
-    currency: String(value.currency || blankLedger.currency),
-    members: Array.isArray(value.members) ? value.members.map(normalizeMember) : [],
-    entries: Array.isArray(value.entries) ? value.entries.map(normalizeEntry) : []
-  };
-}
-
-function normalizeMember(member) {
-  return {
-    id: String(member.id || createId("m")),
-    name: String(member.name || "Friend")
-  };
-}
-
-function normalizeEntry(entry) {
-  return {
-    id: String(entry.id || createId("e")),
-    memberId: String(entry.memberId || ""),
-    amount: Number(entry.amount || 0),
-    date: String(entry.date || `${getCurrentMonth()}-01`)
-  };
-}
-
-function createId(prefix) {
-  return `${prefix}-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`;
-}
-
-function exportLedger() {
-  const blob = new Blob([JSON.stringify(ledger, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${ledger.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "group-savings"}-ledger.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-  showToast("Ledger exported.");
-}
-
-async function importLedger(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-
-  try {
-    const text = await file.text();
-    ledger = normalizeLedger(JSON.parse(text));
-    snapshotMode = false;
-    readOnlyMode = false;
-    document.body.classList.remove("snapshot");
-    document.body.classList.remove("readonly");
-    sessionStorage.removeItem(friendModeKey);
-    sessionStorage.removeItem(readOnlyModeKey);
-    window.history.replaceState(null, "", window.location.pathname);
-    persist();
-    render();
-    showToast("Ledger imported.");
-  } catch {
-    showToast("That file could not be imported.");
-  } finally {
-    event.target.value = "";
-  }
-}
-
-async function copyShareLink() {
-  const snapshot = btoa(unescape(encodeURIComponent(JSON.stringify(ledger))));
-  const link = `${window.location.origin}${window.location.pathname}?view=1#snapshot=${snapshot}`;
-  try {
-    await navigator.clipboard.writeText(link);
-    showToast("View-only share link copied.");
-  } catch {
-    showToast("Copy failed. Export the ledger instead.");
-  }
-}
-
-function isReadOnlyUrl() {
-  const params = new URLSearchParams(window.location.search);
-  return params.get("view") === "1" || params.get("readonly") === "1";
-}
-
-function readSnapshotFromHash() {
-  if (!window.location.hash.startsWith("#snapshot=")) return null;
-  try {
-    const data = window.location.hash.replace("#snapshot=", "");
-    return normalizeLedger(JSON.parse(decodeURIComponent(escape(atob(data)))));
-  } catch {
-    showToast("The shared snapshot link is not valid.");
-    return null;
-  }
-}
-
-function applyReadOnlyMode() {
-  if (!readOnlyMode) return;
-
-  [
-    els.loadSampleBtn,
-    els.exportBtn,
-    els.shareBtn,
-    els.importInput,
-    els.nameInput,
-    els.goalInput,
-    els.monthlyDueInput,
-    els.currencyInput,
-    els.memberNameInput,
-    els.contributorInput,
-    els.amountInput,
-    els.paymentYearInput
-  ].forEach((element) => {
-    if (element) element.disabled = true;
-  });
-
-  document
-    .querySelectorAll('input[name="paymentMonths"], #monthlyMonthInput')
-    .forEach((element) => {
-      element.disabled = true;
-    });
-}
-
 function showToast(message) {
   els.toast.textContent = message;
   els.toast.classList.add("show");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => els.toast.classList.remove("show"), 3200);
+  toastTimer = setTimeout(() => els.toast.classList.remove("show"), 3600);
 }
 
 function escapeHtml(value) {
@@ -593,37 +853,4 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
-}
-
-function createInitialEntries() {
-  const entries = [];
-  const addPaidMonths = (memberId, fullMonths, partialMonthAmount = 0) => {
-    for (let month = 1; month <= fullMonths; month += 1) {
-      entries.push({
-        id: `initial-${memberId}-${String(month).padStart(2, "0")}`,
-        memberId,
-        amount: 50000,
-        date: `2026-${String(month).padStart(2, "0")}-01`
-      });
-    }
-
-    if (partialMonthAmount > 0) {
-      entries.push({
-        id: `initial-${memberId}-partial`,
-        memberId,
-        amount: partialMonthAmount,
-        date: `2026-${String(fullMonths + 1).padStart(2, "0")}-01`
-      });
-    }
-  };
-
-  addPaidMonths("m-2", 4);
-  addPaidMonths("m-3", 5);
-  addPaidMonths("m-4", 3);
-  addPaidMonths("m-5", 3);
-  addPaidMonths("m-6", 3);
-  addPaidMonths("m-7", 5);
-  addPaidMonths("m-8", 4, 25000);
-  addPaidMonths("m-9", 4);
-  return entries;
 }

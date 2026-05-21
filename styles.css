@@ -228,6 +228,12 @@ button:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.auth-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .panel,
 .table-panel {
   background: var(--panel);
@@ -333,6 +339,32 @@ select:focus {
 .hint {
   font-size: 0.88rem;
   margin: 0;
+}
+
+.hint code {
+  background: var(--accent-soft);
+  border-radius: 6px;
+  color: var(--accent-strong);
+  font-size: 0.84rem;
+  padding: 2px 5px;
+}
+
+.button-row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.setup-panel {
+  border-color: var(--accent);
+}
+
+.share-panel {
+  align-content: start;
+}
+
+[hidden] {
+  display: none !important;
 }
 
 .data-grid {
@@ -482,6 +514,13 @@ tbody tr:last-child td {
   padding: 0 10px;
 }
 
+.mini-btn {
+  font-size: 0.84rem;
+  font-weight: 800;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
 .empty-row {
   color: var(--muted);
   text-align: center;
@@ -555,6 +594,10 @@ body.snapshot .data-grid {
   }
 
   .controls-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-grid {
     grid-template-columns: 1fr;
   }
 
