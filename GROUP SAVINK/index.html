@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Group Savings Ledger</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">GS</span>
+        <div>
+          <p class="eyebrow">Shared savings</p>
+          <h1>Group Savings Ledger</h1>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button class="secondary" id="loadSampleBtn" type="button">Load sample</button>
+        <button class="secondary" id="exportBtn" type="button">Export</button>
+        <label class="secondary file-label">
+          Import
+          <input id="importInput" type="file" accept="application/json" />
+        </label>
+        <button class="primary" id="shareBtn" type="button">Copy share link</button>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <section class="summary-band" aria-label="Savings summary">
+        <div class="summary-copy">
+          <p class="eyebrow" id="modeLabel">Editable ledger</p>
+          <h2 id="groupTitle">Friends Savings Circle</h2>
+          <p id="groupSubtitle">Track who contributes, when they paid, and how close the group is to the target.</p>
+        </div>
+        <div class="progress-panel">
+          <div class="progress-topline">
+            <span>Total saved</span>
+            <strong id="totalSaved">$0.00</strong>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <span id="progressFill"></span>
+          </div>
+          <div class="progress-meta">
+            <span id="goalText">Goal: Rp 0</span>
+            <span id="progressPercent">0%</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="controls-grid" aria-label="Ledger controls">
+        <form class="panel" id="settingsForm">
+          <div class="panel-heading">
+            <h3>Group Details</h3>
+            <span>Saved in this browser</span>
+          </div>
+          <label>
+            Group name
+            <input id="nameInput" type="text" maxlength="60" required />
+          </label>
+          <label>
+            Target amount
+            <input id="goalInput" type="number" min="0" step="0.01" required />
+          </label>
+          <label>
+            Monthly amount per friend
+            <input id="monthlyDueInput" type="number" min="0" step="0.01" placeholder="0" />
+          </label>
+          <label>
+            Currency
+            <select id="currencyInput">
+              <option value="IDR">IDR</option>
+              <option value="USD">USD</option>
+              <option value="MYR">MYR</option>
+              <option value="SGD">SGD</option>
+              <option value="PHP">PHP</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+            </select>
+          </label>
+          <button class="primary wide" type="submit">Save details</button>
+        </form>
+
+        <form class="panel" id="memberForm">
+          <div class="panel-heading">
+            <h3>Add Friend</h3>
+            <span>Contributors list</span>
+          </div>
+          <label>
+            Friend name
+            <input id="memberNameInput" type="text" maxlength="50" placeholder="e.g. Maya" required />
+          </label>
+          <button class="primary wide" type="submit">Add friend</button>
+          <p class="hint">Friends appear in the contribution form and totals table.</p>
+        </form>
+
+        <form class="panel" id="contributionForm">
+          <div class="panel-heading">
+            <h3>Add Contribution</h3>
+            <span>Payment record</span>
+          </div>
+          <label>
+            Friend
+            <select id="contributorInput" required></select>
+          </label>
+          <label>
+            Amount
+            <input id="amountInput" type="number" min="0.01" step="0.01" placeholder="25.00" required />
+          </label>
+          <label>
+            Date
+            <input id="dateInput" type="date" required />
+          </label>
+          <label>
+            Note
+            <input id="noteInput" type="text" maxlength="80" placeholder="Monthly saving" />
+          </label>
+          <button class="primary wide" type="submit">Record contribution</button>
+        </form>
+      </section>
+
+      <section class="table-panel monthly-panel" aria-label="Monthly payment check">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Monthly check</p>
+            <h3>Who Paid This Month</h3>
+          </div>
+          <label class="month-picker">
+            Month
+            <input id="monthlyMonthInput" type="month" />
+          </label>
+        </div>
+        <div class="monthly-summary" id="monthlySummary">
+          <span>0 paid</span>
+          <span>0 unpaid</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Paid this month</th>
+                <th>Expected</th>
+                <th>Last payment</th>
+              </tr>
+            </thead>
+            <tbody id="monthlyBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="data-grid">
+        <div class="table-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Contributors</p>
+              <h3>Friend Totals</h3>
+            </div>
+            <span id="memberCount">0 friends</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Contributed</th>
+                  <th>Share</th>
+                  <th class="edit-column">Action</th>
+                </tr>
+              </thead>
+              <tbody id="membersBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">History</p>
+              <h3>Recent Contributions</h3>
+            </div>
+            <span id="entryCount">0 records</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Friend</th>
+                  <th>Amount</th>
+                  <th>Note</th>
+                  <th class="edit-column">Action</th>
+                </tr>
+              </thead>
+              <tbody id="entriesBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="script.js"></script>
+  </body>
+</html>
