@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Tantrum Rajin Menabung</title>
-    <link rel="stylesheet" href="styles.css?v=7" />
+    <link rel="stylesheet" href="styles.css?v=9" />
   </head>
   <body>
     <header class="topbar">
@@ -108,13 +108,13 @@
             <input id="amountInput" type="number" min="0.01" step="0.01" placeholder="100000" required />
           </label>
           <label>
-            Payment starts
-            <input id="paymentMonthInput" type="month" required />
+            Payment year
+            <input id="paymentYearInput" type="number" min="2020" max="2100" step="1" required />
           </label>
-          <label>
-            Months covered
-            <input id="monthsCoveredInput" type="number" min="1" max="12" step="1" value="1" required />
-          </label>
+          <fieldset class="month-select">
+            <legend>Months paid</legend>
+            <div class="month-options" id="paymentMonthsGroup"></div>
+          </fieldset>
           <button class="primary wide" type="submit">Save contribution</button>
         </form>
       </section>
@@ -219,6 +219,6 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="script.js?v=7"></script>
+    <script src="script.js?v=9"></script>
   </body>
 </html>

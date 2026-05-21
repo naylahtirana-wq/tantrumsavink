@@ -1,5 +1,19 @@
-const storageKey = "tantrum-savings-ledger-v5";
+const storageKey = "tantrum-savings-ledger-v7";
 const friendModeKey = "tantrum-friend-contribution-mode";
+const paymentMonths = [
+  ["01", "Jan"],
+  ["02", "Feb"],
+  ["03", "Mar"],
+  ["04", "Apr"],
+  ["05", "May"],
+  ["06", "Jun"],
+  ["07", "Jul"],
+  ["08", "Aug"],
+  ["09", "Sep"],
+  ["10", "Oct"],
+  ["11", "Nov"],
+  ["12", "Dec"]
+];
 
 const sampleLedger = {
   name: "Tantrum's Money",
@@ -11,14 +25,13 @@ const sampleLedger = {
     { id: "m-2", name: "Arsyifa" },
     { id: "m-3", name: "Mila" },
     { id: "m-4", name: "Ditha" },
-    { id: "m-5", name: "Dwikur" },
+    { id: "m-5", name: "Dwi Kurnia" },
     { id: "m-6", name: "Vanka" },
-    { id: "m-7", name: "Tantrum Friend" }
+    { id: "m-7", name: "Selvi" },
+    { id: "m-8", name: "Salma" },
+    { id: "m-9", name: "Zata" }
   ],
-  entries: [
-    { id: "e-1", memberId: "m-1", amount: 50000, date: "2026-01-01" },
-    { id: "e-2", memberId: "m-1", amount: 50000, date: "2026-02-01" }
-  ]
+  entries: createInitialEntries()
 };
 
 const blankLedger = {
@@ -26,8 +39,8 @@ const blankLedger = {
   goal: 10000000,
   monthlyDue: 50000,
   currency: "IDR",
-  members: [],
-  entries: []
+  members: sampleLedger.members.map((member) => ({ ...member })),
+  entries: createInitialEntries()
 };
 
 let ledger = loadLedger();
@@ -59,10 +72,10 @@ const els = {
   monthlyProgressText: document.querySelector("#monthlyProgressText"),
   monthlySummary: document.querySelector("#monthlySummary"),
   monthlyTarget: document.querySelector("#monthlyTarget"),
-  monthsCoveredInput: document.querySelector("#monthsCoveredInput"),
   modeLabel: document.querySelector("#modeLabel"),
   nameInput: document.querySelector("#nameInput"),
-  paymentMonthInput: document.querySelector("#paymentMonthInput"),
+  paymentMonthsGroup: document.querySelector("#paymentMonthsGroup"),
+  paymentYearInput: document.querySelector("#paymentYearInput"),
   progressFill: document.querySelector("#progressFill"),
   progressPercent: document.querySelector("#progressPercent"),
   settingsForm: document.querySelector("#settingsForm"),
@@ -94,7 +107,9 @@ function init() {
     document.body.classList.add("snapshot");
   }
 
-  els.paymentMonthInput.value = getCurrentMonth();
+  renderPaymentMonthOptions();
+  els.paymentYearInput.value = getCurrentYear();
+  setDefaultPaymentMonth();
   els.monthlyMonthInput.value = getCurrentMonth();
   bindEvents();
   render();
@@ -127,25 +142,28 @@ function bindEvents() {
     event.preventDefault();
     const memberId = els.contributorInput.value;
     const amount = Number(els.amountInput.value);
-    const startMonth = els.paymentMonthInput.value;
-    const monthsCovered = Math.max(1, Number(els.monthsCoveredInput.value) || 1);
-    if (!memberId || !amount || !startMonth) return;
+    const paymentYear = Number(els.paymentYearInput.value);
+    const selectedMonths = getSelectedPaymentMonths();
+    if (!memberId || !amount || !paymentYear || !selectedMonths.length) {
+      showToast("Choose at least one paid month.");
+      return;
+    }
 
-    const monthlyAmount = amount / monthsCovered;
-    for (let index = 0; index < monthsCovered; index += 1) {
+    const monthlyAmount = amount / selectedMonths.length;
+    selectedMonths.forEach((month) => {
       ledger.entries.push({
         id: createId("e"),
         memberId,
         amount: monthlyAmount,
-        date: `${addMonths(startMonth, index)}-01`
+        date: `${paymentYear}-${month}-01`
       });
-    }
+    });
 
     els.amountInput.value = "";
-    els.monthsCoveredInput.value = "1";
+    clearSelectedPaymentMonths();
     persist();
     render();
-    showToast(`Contribution saved for ${monthsCovered} ${monthsCovered === 1 ? "month" : "months"}.`);
+    showToast(`Contribution saved for ${selectedMonths.length} ${selectedMonths.length === 1 ? "month" : "months"}.`);
   });
 
   els.membersBody.addEventListener("click", (event) => {
@@ -218,6 +236,17 @@ function renderContributorOptions() {
   els.contributorInput.disabled = false;
   els.contributorInput.innerHTML = ledger.members
     .map((member) => `<option value="${escapeHtml(member.id)}">${escapeHtml(member.name)}</option>`)
+    .join("");
+}
+
+function renderPaymentMonthOptions() {
+  els.paymentMonthsGroup.innerHTML = paymentMonths
+    .map(([value, label]) => `
+      <label class="month-chip">
+        <input type="checkbox" name="paymentMonths" value="${value}" />
+        <span>${label}</span>
+      </label>
+    `)
     .join("");
 }
 
@@ -371,12 +400,28 @@ function getCurrentMonth() {
   return `${today.getFullYear()}-${month}`;
 }
 
-function addMonths(monthValue, offset) {
-  const [year, month] = monthValue.split("-").map(Number);
-  const date = new Date(year, month - 1 + offset, 1);
-  const resultYear = date.getFullYear();
-  const resultMonth = String(date.getMonth() + 1).padStart(2, "0");
-  return `${resultYear}-${resultMonth}`;
+function getCurrentYear() {
+  return new Date().getFullYear();
+}
+
+function setDefaultPaymentMonth() {
+  const currentMonth = getCurrentMonth().slice(5, 7);
+  const currentOption = els.paymentMonthsGroup.querySelector(`[value="${currentMonth}"]`);
+  if (currentOption) currentOption.checked = true;
+}
+
+function getSelectedPaymentMonths() {
+  return [...els.paymentMonthsGroup.querySelectorAll('input[name="paymentMonths"]:checked')]
+    .map((input) => input.value)
+    .sort();
+}
+
+function clearSelectedPaymentMonths() {
+  els.paymentMonthsGroup
+    .querySelectorAll('input[name="paymentMonths"]')
+    .forEach((input) => {
+      input.checked = false;
+    });
 }
 
 function persist() {
@@ -491,4 +536,37 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function createInitialEntries() {
+  const entries = [];
+  const addPaidMonths = (memberId, fullMonths, partialMonthAmount = 0) => {
+    for (let month = 1; month <= fullMonths; month += 1) {
+      entries.push({
+        id: `initial-${memberId}-${String(month).padStart(2, "0")}`,
+        memberId,
+        amount: 50000,
+        date: `2026-${String(month).padStart(2, "0")}-01`
+      });
+    }
+
+    if (partialMonthAmount > 0) {
+      entries.push({
+        id: `initial-${memberId}-partial`,
+        memberId,
+        amount: partialMonthAmount,
+        date: `2026-${String(fullMonths + 1).padStart(2, "0")}-01`
+      });
+    }
+  };
+
+  addPaidMonths("m-2", 4);
+  addPaidMonths("m-3", 5);
+  addPaidMonths("m-4", 3);
+  addPaidMonths("m-5", 3);
+  addPaidMonths("m-6", 3);
+  addPaidMonths("m-7", 5);
+  addPaidMonths("m-8", 4, 25000);
+  addPaidMonths("m-9", 4);
+  return entries;
 }

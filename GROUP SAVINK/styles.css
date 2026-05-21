@@ -271,6 +271,54 @@ select {
   width: 100%;
 }
 
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+legend {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 750;
+  margin: 0 0 8px;
+}
+
+.month-options {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.month-chip {
+  display: block;
+}
+
+.month-chip input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.month-chip span {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  display: flex;
+  font-weight: 850;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.month-chip input:checked + span {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  box-shadow: 0 0 0 3px rgba(232, 117, 164, 0.13);
+}
+
 input:focus,
 select:focus {
   border-color: var(--accent);
@@ -532,6 +580,10 @@ body.snapshot .data-grid {
 
   .summary-copy h2 {
     font-size: 2.2rem;
+  }
+
+  .month-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .progress-topline strong {
