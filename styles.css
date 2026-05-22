@@ -228,12 +228,6 @@ button:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.auth-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
 .panel,
 .table-panel {
   background: var(--panel);
@@ -339,32 +333,6 @@ select:focus {
 .hint {
   font-size: 0.88rem;
   margin: 0;
-}
-
-.hint code {
-  background: var(--accent-soft);
-  border-radius: 6px;
-  color: var(--accent-strong);
-  font-size: 0.84rem;
-  padding: 2px 5px;
-}
-
-.button-row {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 1fr 1fr;
-}
-
-.setup-panel {
-  border-color: var(--accent);
-}
-
-.share-panel {
-  align-content: start;
-}
-
-[hidden] {
-  display: none !important;
 }
 
 .data-grid {
@@ -549,32 +517,13 @@ tbody tr:last-child td {
   transform: translate(-50%, 0);
 }
 
-body.snapshot #settingsForm,
-body.snapshot #memberForm,
-body.snapshot .edit-column,
-body.snapshot .top-actions .secondary:not(#exportBtn),
-body.snapshot #shareBtn {
+body:not(.editing) .controls-grid,
+body:not(.editing) .edit-column {
   display: none;
 }
 
-body.readonly .top-actions,
-body.readonly .controls-grid,
-body.readonly .edit-column {
-  display: none;
-}
-
-body.readonly input,
-body.readonly select,
-body.readonly button {
-  cursor: default;
-}
-
-body.snapshot .controls-grid {
-  grid-template-columns: minmax(0, 520px);
-}
-
-body.snapshot .data-grid {
-  grid-template-columns: 1fr 1.2fr;
+body:not(.editing) .top-actions {
+  justify-content: flex-end;
 }
 
 @media (max-width: 960px) {
@@ -594,10 +543,6 @@ body.snapshot .data-grid {
   }
 
   .controls-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .auth-grid {
     grid-template-columns: 1fr;
   }
 

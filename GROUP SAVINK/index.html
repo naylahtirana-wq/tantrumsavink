@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Tantrum Rajin Menabung</title>
-    <link rel="stylesheet" href="styles.css?v=11" />
+    <link rel="stylesheet" href="styles.css?v=12" />
   </head>
   <body>
     <header class="topbar">
@@ -16,65 +16,19 @@
         </div>
       </div>
       <div class="top-actions">
-        <button class="secondary" id="refreshBtn" type="button">Refresh</button>
-        <button class="primary" id="shareBtn" type="button">Copy view link</button>
+        <button class="secondary" id="exportBtn" type="button">Export</button>
+        <label class="secondary file-label">
+          Import
+          <input id="importInput" type="file" accept="application/json" />
+        </label>
+        <button class="primary" id="editToggleBtn" type="button">Edit data</button>
       </div>
     </header>
 
     <main class="page-shell">
-      <section class="panel setup-panel" id="setupPanel" hidden>
-        <div class="panel-heading">
-          <h3>Supabase Setup Needed</h3>
-          <span>Database not connected</span>
-        </div>
-        <p class="hint">Add your Supabase project URL and anon key in <code>supabase-config.js</code>, then run <code>supabase-schema.sql</code> in the Supabase SQL editor.</p>
-      </section>
-
-      <section class="auth-grid" id="authPanel">
-        <form class="panel" id="authForm">
-          <div class="panel-heading">
-            <h3>Login</h3>
-            <span>Supabase Auth</span>
-          </div>
-          <label>
-            Email
-            <input id="emailInput" type="email" autocomplete="email" required />
-          </label>
-          <label>
-            Password
-            <input id="passwordInput" type="password" autocomplete="current-password" required />
-          </label>
-          <div class="button-row">
-            <button class="primary" id="signInBtn" type="submit">Sign in</button>
-            <button class="secondary" id="signUpBtn" type="button">Create account</button>
-          </div>
-        </form>
-
-        <div class="panel" id="sessionPanel">
-          <div class="panel-heading">
-            <h3>Access</h3>
-            <span id="roleLabel">Not signed in</span>
-          </div>
-          <p class="hint" id="sessionText">Sign in to create or join a tracker. View-only links can be opened without login.</p>
-          <button class="secondary wide" id="signOutBtn" type="button">Sign out</button>
-          <button class="primary wide" id="createGroupBtn" type="button">Create Tantrum tracker</button>
-        </div>
-
-        <div class="panel share-panel" id="sharePanel">
-          <div class="panel-heading">
-            <h3>Share Links</h3>
-            <span>Short group ID</span>
-          </div>
-          <button class="secondary wide admin-only" id="copyAdminLinkBtn" type="button">Copy admin link</button>
-          <button class="secondary wide admin-only" id="copyMemberLinkBtn" type="button">Copy member invite</button>
-          <button class="primary wide" id="copyViewLinkBtn" type="button">Copy view-only link</button>
-          <p class="hint" id="groupLinkText">Links appear after the tracker loads.</p>
-        </div>
-      </section>
-
       <section class="summary-band" aria-label="Savings summary">
         <div class="summary-copy">
-          <p class="eyebrow" id="modeLabel">Editable ledger</p>
+          <p class="eyebrow" id="modeLabel">Tracker view</p>
           <h2 id="groupTitle">Tantrum's Money</h2>
           <p id="groupSubtitle">Track who contributes, when they paid, and how close the group is to the target.</p>
         </div>
@@ -264,8 +218,6 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-config.js?v=1"></script>
-    <script src="script.js?v=11"></script>
+    <script src="script.js?v=12"></script>
   </body>
 </html>
